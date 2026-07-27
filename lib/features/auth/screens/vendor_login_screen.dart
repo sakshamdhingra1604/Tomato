@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../services/auth_service.dart';
 
 class VendorLoginScreen extends StatefulWidget {
   const VendorLoginScreen({Key? key}) : super(key: key);
@@ -12,6 +13,8 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
   bool _obscurePassword = true;
   String? _selectedVendor;
   final TextEditingController _passwordController = TextEditingController();
+  final AuthService _authService = AuthService();
+  bool _isLoading = false;
 
   final List<String> _vendorOptions = [
     'cafe14',
@@ -22,7 +25,7 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
     'old canteen',
   ];
 
-  void _vendorLogin() {
+  void _vendorLogin() async {
     if (_selectedVendor == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select your cafe/canteen')),
@@ -35,10 +38,35 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
       );
       return;
     }
-    // TODO: Implement vendor login backend integration
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Logging in as $_selectedVendor...')),
-    );
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final res = await _authService.vendorLogin(
+        vendorId: _selectedVendor!,
+        password: _passwordController.text,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Logged in successfully as ${res['vendor']['name']}!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -117,8 +145,14 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
               const SizedBox(height: 32),
               
               ElevatedButton(
-                onPressed: _vendorLogin,
-                child: const Text('Login as Vendor'),
+                onPressed: _isLoading ? null : _vendorLogin,
+                child: _isLoading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Login as Vendor'),
               ),
             ],
           ),
