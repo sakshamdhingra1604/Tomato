@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class StudentDetailsScreen extends StatefulWidget {
   const StudentDetailsScreen({Key? key}) : super(key: key);
@@ -43,10 +44,20 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
   final TextEditingController _blockController = TextEditingController();
   final TextEditingController _classController = TextEditingController();
 
-  void _submitDetails() {
+  void _submitDetails() async {
     if (_formKey.currentState?.validate() ?? false) {
-      // TODO: Backend integration for saving student details
-      context.go('/dashboard');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', _nameController.text.trim());
+      await prefs.setString('college_name', _selectedCollege);
+      await prefs.setString('roll_no', _rollNoController.text.trim());
+      await prefs.setString('year', _yearController.text.trim());
+      await prefs.setString('branch', _branchController.text.trim());
+      await prefs.setString('block', _blockController.text.trim());
+      await prefs.setString('class_room', _classController.text.trim());
+
+      if (mounted) {
+        context.go('/dashboard');
+      }
     }
   }
 
