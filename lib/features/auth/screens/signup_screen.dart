@@ -80,8 +80,8 @@ class _SignupScreenState extends State<SignupScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Account created successfully as ${res['user']['name']}!')),
         );
-        // Pop or redirect back to login/home
-        context.pop();
+        // Navigate to complete profile
+        context.go('/student_details');
       }
     } catch (e) {
       if (mounted) {
@@ -184,9 +184,19 @@ class _SignupScreenState extends State<SignupScreen> {
               TextField(
                 controller: _confirmPasswordController,
                 obscureText: _obscurePassword,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Confirm Password',
-                  prefixIcon: Icon(Icons.lock_reset),
+                  prefixIcon: const Icon(Icons.lock_reset),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 32),
@@ -220,6 +230,14 @@ class _SignupScreenState extends State<SignupScreen> {
                     child: const Text('Login'),
                   ),
                 ],
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () {
+                  // Temporary Bypass for Testing
+                  context.go('/student_details');
+                },
+                child: const Text('Bypass Testing', style: TextStyle(color: Colors.grey)),
               ),
             ],
           ),

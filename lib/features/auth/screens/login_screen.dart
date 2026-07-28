@@ -37,8 +37,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Logged in successfully as ${res['user']['name']}!')),
+          SnackBar(
+            content: Text('Welcome back, ${res['user']['name']}! 🍅'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green.shade600,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
         );
+        // Navigate to the main dashboard
+        context.go('/dashboard');
       }
     } catch (e) {
       if (mounted) {
@@ -56,10 +63,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _loginWithGoogle() {
-    // TODO: Implement backend integration for Google Sign-In here
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Google Login logic goes here')),
-    );
+    // Temporary Bypass for Testing
+    context.go('/dashboard');
   }
 
   void _vendorLogin() {
