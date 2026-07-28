@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../auth/services/auth_service.dart';
 
 class StudentDetailsScreen extends StatefulWidget {
   const StudentDetailsScreen({Key? key}) : super(key: key);
@@ -11,6 +11,8 @@ class StudentDetailsScreen extends StatefulWidget {
 
 class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
+  final AuthService _authService = AuthService();
+  bool _isLoading = false;
 
   // Mandatory
   final TextEditingController _nameController = TextEditingController();
@@ -46,17 +48,47 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
 
   void _submitDetails() async {
     if (_formKey.currentState?.validate() ?? false) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_name', _nameController.text.trim());
-      await prefs.setString('college_name', _selectedCollege);
-      await prefs.setString('roll_no', _rollNoController.text.trim());
-      await prefs.setString('year', _yearController.text.trim());
-      await prefs.setString('branch', _branchController.text.trim());
-      await prefs.setString('block', _blockController.text.trim());
-      await prefs.setString('class_room', _classController.text.trim());
+      setState(() {
+        _isLoading = true;
+      });
 
-      if (mounted) {
-        context.go('/dashboard');
+      try {
+        await _authService.updateProfile(
+          name: _nameController.text.trim(),
+          college: _selectedCollege,
+          rollNo: _rollNoController.text.trim(),
+          year: _yearController.text.trim(),
+          branch: _branchController.text.trim(),
+          block: _blockController.text.trim(),
+          classRoom: _classController.text.trim(),
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Profile completed successfully! 🍅'),
+              backgroundColor: Colors.green.shade600,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          context.go('/dashboard');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save details: $e'),
+              backgroundColor: Colors.red.shade600,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -174,8 +206,17 @@ class _StudentDetailsScreenState extends State<StudentDetailsScreen> {
                 
                 const SizedBox(height: 32),
                 ElevatedButton(
-                  onPressed: _submitDetails,
-                  child: const Text('Continue to Dashboard'),
+                  onPressed: _isLoading ? null : _submitDetails,
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text('Continue to Dashboard'),
                 ),
               ],
             ),

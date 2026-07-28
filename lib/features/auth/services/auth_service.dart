@@ -187,4 +187,105 @@ class AuthService {
     final token = await getToken();
     return token != null;
   }
+
+  // Get Profile details from backend
+  Future<Map<String, dynamic>> getProfile() async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/auth/profile');
+    final token = await getToken();
+    
+    try {
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        final user = responseData['user'];
+        await _saveUserSession(
+          token: token ?? '',
+          role: user['role'] ?? 'student',
+          name: user['name'] ?? '',
+          email: user['email'] ?? '',
+        );
+        // Also save additional student details
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('college_name', user['college'] ?? '');
+        await prefs.setString('roll_no', user['rollNo'] ?? '');
+        await prefs.setString('year', user['year'] ?? '');
+        await prefs.setString('branch', user['branch'] ?? '');
+        await prefs.setString('block', user['block'] ?? '');
+        await prefs.setString('class_room', user['classRoom'] ?? '');
+        
+        return responseData;
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to fetch profile');
+      }
+    } catch (e) {
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
+    }
+  }
+
+  // Update Profile details on backend
+  Future<Map<String, dynamic>> updateProfile({
+    required String name,
+    required String college,
+    required String rollNo,
+    required String year,
+    required String branch,
+    String? block,
+    String? classRoom,
+  }) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/auth/profile');
+    final token = await getToken();
+    
+    try {
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'name': name,
+          'college': college,
+          'rollNo': rollNo,
+          'year': year,
+          'branch': branch,
+          'block': block ?? '',
+          'classRoom': classRoom ?? '',
+        }),
+      );
+
+      final responseData = jsonDecode(response.body);
+
+      if (response.statusCode == 200 && responseData['success'] == true) {
+        final user = responseData['user'];
+        await _saveUserSession(
+          token: token ?? '',
+          role: user['role'] ?? 'student',
+          name: user['name'] ?? '',
+          email: user['email'] ?? '',
+        );
+        // Save additional student details locally
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('college_name', user['college'] ?? '');
+        await prefs.setString('roll_no', user['rollNo'] ?? '');
+        await prefs.setString('year', user['year'] ?? '');
+        await prefs.setString('branch', user['branch'] ?? '');
+        await prefs.setString('block', user['block'] ?? '');
+        await prefs.setString('class_room', user['classRoom'] ?? '');
+
+        return responseData;
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to update profile');
+      }
+    } catch (e) {
+      throw Exception(e.toString().replaceAll('Exception: ', ''));
+    }
+  }
 }

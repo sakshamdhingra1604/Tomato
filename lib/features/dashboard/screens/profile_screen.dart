@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../auth/services/auth_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -11,6 +12,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final AuthService _authService = AuthService();
   String _name = 'Student User';
   String _email = 'student@piet.co.in';
   String _college = 'P.I.E.T. Campus';
@@ -21,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _room = 'Room 304';
   bool _notificationsEnabled = true;
   bool _isLoading = true;
+  bool _isFetching = false;
 
   @override
   void initState() {
@@ -30,17 +33,66 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadStudentData() async {
     final prefs = await SharedPreferences.getInstance();
+    final cachedName = prefs.getString('user_name');
+    
     setState(() {
-      _name = prefs.getString('user_name') ?? _name;
-      _email = prefs.getString('user_email') ?? _email;
-      _college = prefs.getString('college_name') ?? _college;
-      _rollNo = prefs.getString('roll_no') ?? _rollNo;
-      _branch = prefs.getString('branch') ?? _branch;
-      _year = prefs.getString('year') != null ? '${prefs.getString('year')} Year' : _year;
-      _block = prefs.getString('block') ?? _block;
-      _room = prefs.getString('class_room') ?? _room;
-      _isLoading = false;
+      if (cachedName != null) {
+        _name = cachedName;
+        _email = prefs.getString('user_email') ?? _email;
+        _college = prefs.getString('college_name') ?? _college;
+        _rollNo = prefs.getString('roll_no') ?? _rollNo;
+        _branch = prefs.getString('branch') ?? _branch;
+        _year = prefs.getString('year') != null && prefs.getString('year')!.isNotEmpty
+            ? (prefs.getString('year')!.contains('Year') ? prefs.getString('year')! : '${prefs.getString('year')} Year')
+            : _year;
+        _block = prefs.getString('block') ?? _block;
+        _room = prefs.getString('class_room') ?? _room;
+        _isLoading = false;
+      } else {
+        _isLoading = true;
+      }
     });
+
+    await _fetchProfile();
+  }
+
+  Future<void> _fetchProfile() async {
+    if (_isFetching) return;
+    setState(() {
+      _isFetching = true;
+    });
+
+    try {
+      final res = await _authService.getProfile();
+      if (res['success'] == true) {
+        final user = res['user'];
+        setState(() {
+          _name = user['name'] ?? _name;
+          _email = user['email'] ?? _email;
+          _college = user['college'] ?? _college;
+          _rollNo = user['rollNo'] ?? _rollNo;
+          _branch = user['branch'] ?? _branch;
+          _year = user['year'] != null && user['year'].toString().isNotEmpty
+              ? (user['year'].toString().contains('Year') ? user['year'].toString() : '${user['year']} Year')
+              : _year;
+          _block = user['block'] ?? _block;
+          _room = user['classRoom'] ?? _room;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to sync profile from API: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isFetching = false;
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshProfile() async {
+    await _fetchProfile();
   }
 
   void _showLogoutDialog() {
@@ -89,20 +141,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
 
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.all(20.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        child: _isLoading
+            ? SingleChildScrollView(
+                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20.0),
+                child: _buildShimmerProfile(context),
+              )
+            : RefreshIndicator(
+                onRefresh: _refreshProfile,
+                color: primaryColor,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
               // Title
               Text(
                 'Student Profile',
@@ -343,8 +398,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildInfoRow(BuildContext context, IconData icon, String label, String value) {
     final theme = Theme.of(context);
@@ -389,6 +445,146 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
       subtitle: Text(subtitle, style: theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
       trailing: trailing ?? const Icon(Icons.chevron_right_rounded, size: 20),
+    );
+  }
+
+  Widget _buildShimmerProfile(BuildContext context) {
+    final theme = Theme.of(context);
+    final baseColor = theme.brightness == Brightness.dark ? Colors.grey[800]! : Colors.grey[300]!;
+    final highlightColor = theme.brightness == Brightness.dark ? Colors.grey[700]! : Colors.grey[100]!;
+
+    return Shimmer.fromColors(
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Title placeholder
+          Container(
+            width: 160,
+            height: 28,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Profile Header Card placeholder
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 120,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        width: 180,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        width: 140,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Academic Title placeholder
+          Container(
+            width: 180,
+            height: 18,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Academic Card placeholder
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              children: List.generate(5, (index) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8.0),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        width: 80,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        width: 100,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
