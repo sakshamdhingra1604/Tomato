@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
 import 'dart:math';
 import 'dart:async';
@@ -50,7 +51,7 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
     _tabController = TabController(length: 4, vsync: this);
     
     // Simulate incoming order after a delay
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(seconds: 4), () {
       if (mounted && _isOnline) {
         _simulateNewOrder();
       }
@@ -67,7 +68,17 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
     return (1000 + Random().nextInt(9000)).toString();
   }
 
+  void _triggerVibrationAlert() async {
+    // Vibrate three times sequentially to alert the vendor
+    for (int i = 0; i < 3; i++) {
+      await HapticFeedback.vibrate();
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
+  }
+
   void _simulateNewOrder() {
+    _triggerVibrationAlert();
+
     final pin = _generatePin();
     final newOrder = {
       'id': '#ORD-${8823 + _newOrders.length + _completedOrders.length}',
@@ -81,13 +92,14 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
       'total': 150,
     };
 
-    // Show popup
+    // Show popup alert
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        // Auto dismiss after 2.5 seconds and move to pending
-        Future.delayed(const Duration(milliseconds: 2500), () {
+        // Auto-dismiss after 3 seconds and accept it automatically
+        Timer? autoAcceptTimer;
+        autoAcceptTimer = Timer(const Duration(milliseconds: 3000), () {
           if (Navigator.of(context).canPop()) {
             Navigator.of(context).pop();
             _moveToPending(newOrder);
@@ -95,50 +107,103 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
         });
 
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Row(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 10,
+          title: Row(
             children: [
-              Icon(Iconsax.notification_bing5, color: Colors.green),
-              SizedBox(width: 10),
-              Text('New Order Received!'),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Iconsax.notification_bing5, color: Colors.green, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Incoming Order!',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
             ],
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${newOrder['student']} just placed an order.'),
-              const SizedBox(height: 10),
-              Text('Total: ₹${newOrder['total']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              const Center(
-                child: SizedBox(
-                  width: 30,
-                  height: 30,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+              Text(
+                'New order placed by ${newOrder['student']}',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    ...List.generate((newOrder['items'] as List).length, (i) {
+                      final item = (newOrder['items'] as List)[i] as Map<String, dynamic>;
+                      return Row(
+                        children: [
+                          Text('${item['qty']}x', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          Text(item['name']),
+                        ],
+                      );
+                    }),
+                    const Divider(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Total Bill:', style: TextStyle(fontWeight: FontWeight.w500)),
+                        Text('₹${newOrder['total']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 10),
-              const Center(child: Text('Auto-accepting...', style: TextStyle(color: Colors.grey, fontSize: 12))),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.green),
+                  ),
+                  SizedBox(width: 10),
+                  Text(
+                    'Auto-accepting soon...',
+                    style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
             ],
           ),
+          actionsAlignment: MainAxisAlignment.spaceBetween,
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           actions: [
             TextButton(
               onPressed: () {
+                autoAcceptTimer?.cancel();
                 Navigator.of(context).pop();
-                setState(() {
-                  // Rejected
-                });
               },
-              child: const Text('Reject', style: TextStyle(color: Colors.red)),
+              child: const Text('Reject', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
+              ),
               onPressed: () {
+                autoAcceptTimer?.cancel();
                 Navigator.of(context).pop();
                 _acceptOrderDirectly(newOrder);
               },
-              child: const Text('Accept Now', style: TextStyle(color: Colors.white)),
+              child: const Text('Accept Now', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         );
@@ -154,7 +219,10 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
       _newOrders.remove(order);
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Order ${order['id']} moved to Pending!')),
+      SnackBar(
+        content: Text('Order ${order['id']} moved to Pending!'),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 
@@ -164,7 +232,11 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
       _preparingOrders.insert(0, order);
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Order ${order['id']} accepted and preparing!')),
+      SnackBar(
+        content: Text('Order ${order['id']} accepted and preparing! 🍳'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.green.shade600,
+      ),
     );
   }
 
@@ -179,6 +251,13 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
     setState(() {
       _pendingOrders.remove(order);
     });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Order ${order['id']} rejected.'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.red.shade600,
+      ),
+    );
   }
 
   void _markAsReady(Map<String, dynamic> order) {
@@ -186,6 +265,13 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
       _preparingOrders.remove(order);
       _readyOrders.insert(0, order);
     });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Order ${order['id']} marked as Ready!'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.orange.shade600,
+      ),
+    );
   }
 
   void _markAsDone(Map<String, dynamic> order) {
@@ -194,7 +280,11 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
       _completedOrders.insert(0, order);
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Order marked as Completed!')),
+      SnackBar(
+        content: Text('Order ${order['id']} successfully handed over! 🍅'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.green.shade600,
+      ),
     );
   }
 
@@ -213,14 +303,15 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
             _buildStatsSection(),
             const SizedBox(height: 16),
             _buildTabBar(isDark),
+            const SizedBox(height: 8),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  _buildOrderList(_pendingOrders, 'pending'),
-                  _buildOrderList(_preparingOrders, 'preparing'),
-                  _buildOrderList(_readyOrders, 'ready'),
-                  _buildOrderList(_completedOrders, 'completed'),
+                  _buildOrderList(_pendingOrders, 'Pending'),
+                  _buildOrderList(_preparingOrders, 'Preparing'),
+                  _buildOrderList(_readyOrders, 'Ready'),
+                  _buildOrderList(_completedOrders, 'Completed'),
                 ],
               ),
             ),
@@ -231,41 +322,87 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
   }
 
   Widget _buildHeader(bool isDark) {
+    final primaryColor = Theme.of(context).primaryColor;
     return Padding(
-      padding: const EdgeInsets.all(20.0),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Welcome Back,', style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: _isOnline ? Colors.green : Colors.grey,
+                      shape: BoxShape.circle,
+                      boxShadow: _isOnline
+                          ? [
+                              BoxShadow(
+                                color: Colors.green.withOpacity(0.5),
+                                blurRadius: 6,
+                                spreadRadius: 2,
+                              )
+                            ]
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isOnline ? 'LIVE PORTAL ACTIVE' : 'PORTAL OFFLINE',
+                    style: TextStyle(
+                      color: _isOnline ? Colors.green.shade600 : Colors.grey,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
               const Text(
-                'Vendor Dashboard',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                'Vendor Orders',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: -0.5),
               ),
             ],
           ),
-          Row(
-            children: [
-              Text(
-                _isOnline ? 'Online' : 'Offline',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: _isOnline ? Colors.green : Colors.grey,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: _isOnline ? Colors.green.withOpacity(0.08) : Colors.grey.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _isOnline ? Colors.green.withOpacity(0.2) : Colors.grey.withOpacity(0.2),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  _isOnline ? 'Online' : 'Offline',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: _isOnline ? Colors.green.shade700 : Colors.grey.shade700,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Switch(
-                value: _isOnline,
-                activeColor: Colors.green,
-                onChanged: (val) {
-                  setState(() {
-                    _isOnline = val;
-                  });
-                },
-              ),
-            ],
+                const SizedBox(width: 4),
+                Transform.scale(
+                  scale: 0.8,
+                  child: Switch(
+                    value: _isOnline,
+                    activeColor: Colors.green,
+                    onChanged: (val) {
+                      setState(() {
+                        _isOnline = val;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
           )
         ],
       ),
@@ -276,35 +413,39 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
     int totalOrders = _preparingOrders.length + _readyOrders.length + _completedOrders.length;
     double earnings = _completedOrders.fold(0.0, (sum, item) => sum + (item['total'] as int));
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0),
-      child: Row(
+    return SizedBox(
+      height: 95,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
-          Expanded(
-            child: _StatCard(
-              title: 'Pending',
-              value: '${_pendingOrders.length + _preparingOrders.length}',
-              icon: Iconsax.timer,
-              color: Colors.orange,
-            ),
+          _StatCard(
+            title: 'Active Orders',
+            value: '${_pendingOrders.length + _preparingOrders.length}',
+            icon: Iconsax.timer,
+            color: Colors.orange,
           ),
           const SizedBox(width: 12),
-          Expanded(
-            child: _StatCard(
-              title: 'Completed',
-              value: '${_completedOrders.length}',
-              icon: Iconsax.task_square,
-              color: Colors.blue,
-            ),
+          _StatCard(
+            title: 'Ready Pickup',
+            value: '${_readyOrders.length}',
+            icon: Iconsax.box,
+            color: Colors.green,
           ),
           const SizedBox(width: 12),
-          Expanded(
-            child: _StatCard(
-              title: 'Earnings',
-              value: '₹${earnings.toInt()}',
-              icon: Iconsax.wallet,
-              color: Colors.green,
-            ),
+          _StatCard(
+            title: 'Completed',
+            value: '${_completedOrders.length}',
+            icon: Iconsax.task_square,
+            color: Colors.blue,
+          ),
+          const SizedBox(width: 12),
+          _StatCard(
+            title: 'Today Earnings',
+            value: '₹${earnings.toInt()}',
+            icon: Iconsax.wallet,
+            color: Colors.teal,
           ),
         ],
       ),
@@ -315,20 +456,23 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0),
       child: Container(
-        height: 45,
+        height: 48,
         decoration: BoxDecoration(
-          color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(25.0),
+          color: isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(16.0),
         ),
         child: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.center,
           indicatorSize: TabBarIndicatorSize.tab,
+          indicatorPadding: const EdgeInsets.all(4.0),
           indicator: BoxDecoration(
-            borderRadius: BorderRadius.circular(25.0),
+            borderRadius: BorderRadius.circular(12.0),
             color: Theme.of(context).primaryColor,
             boxShadow: [
               BoxShadow(
-                color: Theme.of(context).primaryColor.withOpacity(0.3),
+                color: Theme.of(context).primaryColor.withOpacity(0.2),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -336,7 +480,7 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
           ),
           labelColor: Colors.white,
           unselectedLabelColor: isDark ? Colors.white70 : Colors.black54,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+          labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
           tabs: [
             Tab(
               child: Row(
@@ -344,13 +488,16 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
                 children: [
                   const Text('Pending'),
                   if (_pendingOrders.isNotEmpty) ...[
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Container(
-                      width: 8,
-                      height: 8,
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: const BoxDecoration(
                         color: Colors.red,
-                        shape: BoxShape.circle,
+                        borderRadius: BorderRadius.all(Radius.circular(10)),
+                      ),
+                      child: Text(
+                        '${_pendingOrders.length}',
+                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
                       ),
                     )
                   ]
@@ -359,7 +506,7 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
             ),
             const Tab(text: 'Preparing'),
             const Tab(text: 'Ready'),
-            const Tab(text: 'Completed'),
+            const Tab(text: 'History'),
           ],
         ),
       ),
@@ -372,20 +519,31 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Iconsax.box, size: 60, color: Colors.grey.shade400),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Iconsax.box, size: 48, color: Colors.grey.shade400),
+            ),
             const SizedBox(height: 16),
-            Text('No $status orders', style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+            Text(
+              'No $status orders right now',
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 14, fontWeight: FontWeight.w500),
+            ),
           ],
         ),
       );
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(20),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       itemCount: orders.length,
       itemBuilder: (context, index) {
         final order = orders[index];
-        return _buildOrderCard(order, status, context);
+        return _buildOrderCard(order, status.toLowerCase(), context);
       },
     );
   }
@@ -399,11 +557,14 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+        border: Border.all(
+          color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
             offset: const Offset(0, 4),
           ),
         ],
@@ -411,12 +572,12 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header
+          // Order Card Header
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF252525) : Colors.grey.shade50,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -426,31 +587,38 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
                   children: [
                     Text(
                       order['id'],
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      order['time'],
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Iconsax.clock, size: 12, color: Colors.grey.shade500),
+                        const SizedBox(width: 4),
+                        Text(
+                          order['time'],
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
+                      ],
                     ),
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
+                    color: theme.primaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
                     children: [
-                      Icon(Iconsax.lock, size: 14, color: Theme.of(context).primaryColor),
+                      Icon(Iconsax.key, size: 12, color: theme.primaryColor),
                       const SizedBox(width: 4),
                       Text(
                         'PIN: ${order['pin']}',
                         style: TextStyle(
-                          color: Theme.of(context).primaryColor,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
+                          color: theme.primaryColor,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 12,
+                          letterSpacing: 1.2,
                         ),
                       ),
                     ],
@@ -460,7 +628,7 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
             ),
           ),
           
-          // Body
+          // Order Card Body
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -468,57 +636,61 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
               children: [
                 Row(
                   children: [
-                    const Icon(Iconsax.profile_circle, size: 16, color: Colors.grey),
+                    Icon(Iconsax.user, size: 16, color: Colors.grey.shade500),
                     const SizedBox(width: 8),
                     Text(
                       order['student'],
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                   ],
                 ),
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
-                  child: Divider(height: 1),
+                  child: Divider(height: 1, thickness: 0.8),
                 ),
-                // Items
+                
+                // Item Lines
                 ...List.generate(order['items'].length, (i) {
                   final item = order['items'][i];
                   return Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
+                    padding: const EdgeInsets.only(bottom: 10.0),
                     child: Row(
                       children: [
                         Container(
-                          width: 24,
-                          height: 24,
-                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.grey.shade800 : Colors.grey.shade200,
+                            color: isDark ? Colors.grey.shade800 : Colors.grey.shade100,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             '${item['qty']}x',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Colors.grey),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             item['name'],
-                            style: const TextStyle(fontSize: 14),
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                           ),
                         ),
                       ],
                     ),
                   );
                 }),
-                const SizedBox(height: 4),
+                
+                const Divider(height: 16, thickness: 0.8),
+                
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Total Amount:', style: TextStyle(fontWeight: FontWeight.w500, color: Colors.grey)),
+                    const Text(
+                      'Payment Status: Mock Cash',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.grey),
+                    ),
                     Text(
                       '₹${order['total']}',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: theme.primaryColor),
                     ),
                   ],
                 ),
@@ -526,7 +698,7 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
             ),
           ),
 
-          // Actions
+          // Action Buttons
           if (status == 'pending')
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -537,11 +709,11 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
                       onPressed: () => _rejectFromPending(order),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
+                        side: const BorderSide(color: Colors.red, width: 1.5),
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -550,10 +722,11 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
                       onPressed: () => _acceptFromPending(order),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
+                        elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
-                      child: const Text('Accept', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      child: const Text('Accept', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                     ),
                   ),
                 ],
@@ -563,28 +736,32 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
           if (status == 'preparing')
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
+                icon: const Icon(Iconsax.tick_circle, color: Colors.white, size: 16),
                 onPressed: () => _markAsReady(order),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Mark as Ready', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                label: const Text('Mark as Ready / Pack', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ),
             
           if (status == 'ready')
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
+                icon: const Icon(Iconsax.verify, color: Colors.white, size: 16),
                 onPressed: () => _markAsDone(order),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                child: const Text('Handover Done (Verify PIN)', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                label: const Text('Verify PIN & Handover', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
               ),
             ),
         ],
@@ -612,6 +789,7 @@ class _StatCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
     return Container(
+      width: 125,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
@@ -619,32 +797,39 @@ class _StatCard extends StatelessWidget {
         border: Border.all(color: isDark ? Colors.grey.shade800 : Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 5,
+            color: Colors.black.withOpacity(0.01),
+            blurRadius: 4,
             offset: const Offset(0, 2),
           ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 16),
+              ),
+              Text(
+                value,
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-          ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 8),
           Text(
             title,
-            style: TextStyle(color: Colors.grey.shade600, fontSize: 12, fontWeight: FontWeight.w500),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: Colors.grey.shade600, fontSize: 11, fontWeight: FontWeight.w600),
           ),
         ],
       ),

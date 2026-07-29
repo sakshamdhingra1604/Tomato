@@ -22,11 +22,23 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
     'One Stop',
     'College Cafe',
     'Cafe14',
-    'Netcafe',
+    'Nescafe',
     'Old Canteen',
     'Deepak\'s Cafe',
     'College Mess',
   ];
+
+  final Map<String, String> _vendorIdMap = {
+    'Bunny\'s Kitchen': 'bunny kitchen',
+    'Froot Shoot': 'froot shoot',
+    'One Stop': 'one stop',
+    'Cafe14': 'cafe14',
+    'Nescafe': 'nescafe',
+    'Old Canteen': 'old canteen',
+    'College Cafe': 'college cafe',
+    'Deepak\'s Cafe': 'deepak\'s cafe',
+    'College Mess': 'college mess',
+  };
 
   void _vendorLogin() async {
     if (_selectedVendor == null) {
@@ -42,10 +54,17 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
       return;
     }
 
-    // Mock bypass for testing frontend Vendor Portal
-    if (_passwordController.text == '123456') {
+    final String expectedPassword = '${_selectedVendor!.replaceAll(' ', '').replaceAll('\'', '')}@123';
+
+    // Mock bypass for testing frontend Vendor Portal (allows CafeName@123 and 123456)
+    if (_passwordController.text == expectedPassword || _passwordController.text == '123456') {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Logged in successfully as $_selectedVendor (Mock)!')),
+        SnackBar(
+          content: Text('Logged in successfully as $_selectedVendor! 🍅'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green.shade600,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
       );
       context.go('/vendor_dashboard');
       return;
@@ -56,21 +75,31 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
     });
 
     try {
+      final backendVendorId = _vendorIdMap[_selectedVendor] ?? _selectedVendor!.toLowerCase();
       final res = await _authService.vendorLogin(
-        vendorId: _selectedVendor!.toLowerCase().replaceAll(' ', ''),
+        vendorId: backendVendorId,
         password: _passwordController.text,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Logged in successfully as ${res['vendor']['name']}!')),
+          SnackBar(
+            content: Text('Logged in successfully as ${res['vendor']['name']}! 🍅'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green.shade600,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
         );
         context.go('/vendor_dashboard');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(
+            content: Text(e.toString()),
+            backgroundColor: Colors.red.shade600,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {

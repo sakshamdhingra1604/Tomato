@@ -297,7 +297,7 @@ class CanteenData {
     ),
     Canteen(
       id: 'c6',
-      name: 'Netcafe',
+      name: 'Nescafe',
       rating: 4.2,
       ratingCount: 150,
       prepTimeEstimate: '8-12 mins',

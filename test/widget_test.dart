@@ -11,20 +11,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tomato/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('Splash Screen smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const TomatoApp());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify that the title 'Tomato' exists on splash screen.
+    expect(find.text('Tomato'), findsOneWidget);
+    expect(find.text('Skip the Queue, Not the Food.'), findsOneWidget);
+    
+    // Drain pending routing timers to avoid leaks
+    await tester.pump(const Duration(seconds: 5));
   });
 }
