@@ -17,12 +17,15 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
   bool _isLoading = false;
 
   final List<String> _vendorOptions = [
-    'cafe14',
-    'one stop',
-    'froot shoot',
-    'netcafe',
-    'bunny kitchen',
-    'old canteen',
+    'Bunny\'s Kitchen',
+    'Froot Shoot',
+    'One Stop',
+    'College Cafe',
+    'Cafe14',
+    'Netcafe',
+    'Old Canteen',
+    'Deepak\'s Cafe',
+    'College Mess',
   ];
 
   void _vendorLogin() async {
@@ -39,13 +42,22 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
       return;
     }
 
+    // Mock bypass for testing frontend Vendor Portal
+    if (_passwordController.text == '123456') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Logged in successfully as $_selectedVendor (Mock)!')),
+      );
+      context.go('/vendor_dashboard');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
     try {
       final res = await _authService.vendorLogin(
-        vendorId: _selectedVendor!,
+        vendorId: _selectedVendor!.toLowerCase().replaceAll(' ', ''),
         password: _passwordController.text,
       );
 
@@ -53,6 +65,7 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Logged in successfully as ${res['vendor']['name']}!')),
         );
+        context.go('/vendor_dashboard');
       }
     } catch (e) {
       if (mounted) {

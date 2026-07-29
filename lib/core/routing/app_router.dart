@@ -12,6 +12,7 @@ import '../../features/dashboard/screens/canteen_detail_screen.dart';
 
 import '../../features/dashboard/screens/search_screen.dart';
 import '../../features/dashboard/screens/notification_screen.dart';
+import '../../features/vendor_portal/screens/vendor_main_layout_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -62,6 +63,10 @@ class AppRouter {
       GoRoute(
         path: '/notification',
         builder: (context, state) => const NotificationScreen(),
+      ),
+      GoRoute(
+        path: '/vendor_dashboard',
+        builder: (context, state) => const VendorMainLayoutScreen(),
       ),
     ],
   );
