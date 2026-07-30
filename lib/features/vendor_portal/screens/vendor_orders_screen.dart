@@ -114,7 +114,7 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.15),
+                  color: Colors.green.withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Iconsax.notification_bing5, color: Colors.green, size: 24),
@@ -138,7 +138,7 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.08),
+                  color: Colors.grey.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -322,7 +322,6 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
   }
 
   Widget _buildHeader(bool isDark) {
-    final primaryColor = Theme.of(context).primaryColor;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Row(
@@ -342,7 +341,7 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
                       boxShadow: _isOnline
                           ? [
                               BoxShadow(
-                                color: Colors.green.withOpacity(0.5),
+                                color: Colors.green.withValues(alpha: 0.3),
                                 blurRadius: 6,
                                 spreadRadius: 2,
                               )
@@ -421,14 +420,21 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
         padding: const EdgeInsets.symmetric(horizontal: 16),
         children: [
           _StatCard(
-            title: 'Active Orders',
-            value: '${_pendingOrders.length + _preparingOrders.length}',
+            title: 'Pending',
+            value: '${_pendingOrders.length}',
+            icon: Iconsax.notification_bing,
+            color: Colors.red,
+          ),
+          const SizedBox(width: 12),
+          _StatCard(
+            title: 'Preparing',
+            value: '${_preparingOrders.length}',
             icon: Iconsax.timer,
             color: Colors.orange,
           ),
           const SizedBox(width: 12),
           _StatCard(
-            title: 'Ready Pickup',
+            title: 'Ready',
             value: '${_readyOrders.length}',
             icon: Iconsax.box,
             color: Colors.green,
@@ -442,7 +448,7 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
           ),
           const SizedBox(width: 12),
           _StatCard(
-            title: 'Today Earnings',
+            title: 'Earnings',
             value: '₹${earnings.toInt()}',
             icon: Iconsax.wallet,
             color: Colors.teal,
@@ -605,7 +611,7 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: theme.primaryColor.withOpacity(0.1),
+                    color: theme.primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -813,7 +819,7 @@ class _StatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
+                  color: color.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(icon, color: color, size: 16),
