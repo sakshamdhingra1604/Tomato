@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../auth/services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -32,10 +34,38 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    // Navigate to onboarding after animation finishes + small delay
-    Future.delayed(const Duration(milliseconds: 3500), () {
-      if (mounted) {
-        context.go('/onboarding');
+    // Check session & onboarding seen status before routing
+    Future.delayed(const Duration(milliseconds: 3500), () async {
+      if (!mounted) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final hasSeenOnboarding = prefs.getBool('has_seen_onboarding') ?? false;
+
+      final authService = AuthService();
+      final isLoggedIn = await authService.isLoggedIn();
+
+      if (!mounted) return;
+
+      if (isLoggedIn) {
+        final authType = await authService.getAuthType();
+        if (authType == 'vendor') {
+          context.go('/vendor_dashboard');
+        } else {
+          // Check if profile is complete
+          final college = prefs.getString('college_name');
+          final rollNo = prefs.getString('roll_no');
+          if (college == null || college.isEmpty || rollNo == null || rollNo.isEmpty) {
+            context.go('/student_details');
+          } else {
+            context.go('/dashboard');
+          }
+        }
+      } else {
+        if (hasSeenOnboarding) {
+          context.go('/login');
+        } else {
+          context.go('/onboarding');
+        }
       }
     });
   }

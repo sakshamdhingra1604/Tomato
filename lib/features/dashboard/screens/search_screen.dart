@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
 import '../data/canteen_data.dart';
+import '../services/cart_manager.dart';
+import '../services/canteen_service.dart';
 
 class SearchScreenItem {
   final MenuItem item;
@@ -20,24 +23,96 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   late TextEditingController _searchController;
+  final CanteenService _canteenService = CanteenService();
+  final CartManager _cartManager = CartManager();
+  List<Canteen> _canteens = [];
+  bool _isLoading = true;
   String _selectedSort = 'Default'; // 'Default', 'Price: Low to High', 'Rating: High to Low', 'Fastest Prep'
-  final Map<String, int> _cart = {}; // itemId -> qty
 
   @override
   void initState() {
     super.initState();
     _searchController = TextEditingController(text: widget.initialQuery);
+    _cartManager.addListener(_onCartChanged);
+    _loadCanteens();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _cartManager.removeListener(_onCartChanged);
     super.dispose();
+  }
+
+  void _onCartChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _loadCanteens() async {
+    try {
+      final vendors = await _canteenService.getVendors();
+      final List<Canteen> tempCanteens = [];
+
+      for (var v in vendors) {
+        final vendorId = v['vendorId'] ?? '';
+        final vendorName = v['name'] ?? '';
+        final isOpen = v['isOpen'] ?? true;
+
+        List<dynamic> itemsData = [];
+        try {
+          itemsData = await _canteenService.getMenuForCafe(vendorId);
+        } catch (e) {
+          debugPrint('Failed to load menu for $vendorId: $e');
+        }
+
+        final menuItems = itemsData.map((item) {
+          return MenuItem(
+            id: item['_id'] ?? '',
+            name: item['name'] ?? '',
+            price: (item['price'] as num?)?.toDouble() ?? 0.0,
+            description: item['description'] ?? '',
+            rating: 4.5,
+            reviewsCount: 20,
+            category: item['category'] ?? 'Snacks',
+            isVeg: true,
+            prepTimeMins: 10,
+          );
+        }).toList();
+
+        tempCanteens.add(Canteen(
+          id: vendorId,
+          name: vendorName,
+          rating: 4.5,
+          ratingCount: 120,
+          prepTimeEstimate: '10-15 mins',
+          priceForTwo: '₹150 for two',
+          isAvailable: isOpen,
+          tag: vendorId == 'cafe14' ? 'Top Rated' : 'Campus Favorite',
+          menuItems: menuItems,
+        ));
+      }
+
+      if (mounted) {
+        setState(() {
+          _canteens = tempCanteens;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      debugPrint('Error loading canteens in search: $e');
+    }
   }
 
   List<SearchScreenItem> get _allSearchItems {
     final List<SearchScreenItem> list = [];
-    for (var canteen in CanteenData.canteens) {
+    for (var canteen in _canteens) {
       if (canteen.isAvailable) {
         for (var item in canteen.menuItems) {
           list.add(SearchScreenItem(item: item, canteen: canteen));
@@ -71,38 +146,20 @@ class _SearchScreenState extends State<SearchScreen> {
     return results;
   }
 
-  int get _totalCartItems => _cart.values.fold(0, (sum, count) => sum + count);
-
-  double get _totalCartPrice {
-    double total = 0;
-    _cart.forEach((itemId, qty) {
-      for (var canteen in CanteenData.canteens) {
-        for (var item in canteen.menuItems) {
-          if (item.id == itemId) {
-            total += (item.price * qty);
-          }
-        }
-      }
-    });
-    return total;
-  }
-
-  void _addItem(String id) {
-    setState(() {
-      _cart[id] = (_cart[id] ?? 0) + 1;
-    });
+  void _addItem(MenuItem item, Canteen canteen) {
+    _cartManager.addItem(
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      description: item.description,
+      prepTimeMins: item.prepTimeMins,
+      vendorId: canteen.id,
+      vendorName: canteen.name,
+    );
   }
 
   void _removeItem(String id) {
-    setState(() {
-      if (_cart.containsKey(id)) {
-        if (_cart[id]! > 1) {
-          _cart[id] = _cart[id]! - 1;
-        } else {
-          _cart.remove(id);
-        }
-      }
-    });
+    _cartManager.removeItem(id);
   }
 
   @override
@@ -110,6 +167,8 @@ class _SearchScreenState extends State<SearchScreen> {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
     final results = _filteredAndSortedItems;
+    final totalCartItems = _cartManager.totalItems;
+    final totalCartPrice = _cartManager.totalPrice;
 
     return Scaffold(
       appBar: AppBar(
@@ -128,166 +187,133 @@ class _SearchScreenState extends State<SearchScreen> {
           decoration: InputDecoration(
             hintText: "Search 'Burgers', 'Pasta', 'Momos'...",
             border: InputBorder.none,
-            enabledBorder: InputBorder.none,
-            focusedBorder: InputBorder.none,
-            hintStyle: theme.textTheme.bodyMedium,
-            suffixIcon: _searchController.text.isNotEmpty
-                ? IconButton(
-                    icon: const Icon(Icons.clear_rounded),
-                    onPressed: () {
-                      setState(() {
-                        _searchController.clear();
-                      });
-                    },
-                  )
-                : null,
+            hintStyle: TextStyle(color: theme.disabledColor),
           ),
+          style: TextStyle(color: theme.textTheme.bodyLarge?.color),
         ),
       ),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      body: _isLoading
+          ? _buildShimmer(context)
+          : Stack(
               children: [
-                // Sort Chips Row
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    children: [
-                      _buildSortChip('Default'),
-                      _buildSortChip('Price: Low to High'),
-                      _buildSortChip('Rating: High to Low'),
-                      _buildSortChip('Fastest Prep'),
-                    ],
-                  ),
-                ),
-
-                const Divider(height: 1),
-
-                // Results Count Header
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-                  child: Text(
-                    _searchController.text.isEmpty
-                        ? 'All Campus Dishes (${results.length})'
-                        : 'Found ${results.length} dishes for "${_searchController.text}"',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                Column(
+                  children: [
+                    // Sort Options Horizontal Bar
+                    SizedBox(
+                      height: 52,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        physics: const BouncingScrollPhysics(),
+                        children: [
+                          _buildSortChip('Default'),
+                          _buildSortChip('Price: Low to High'),
+                          _buildSortChip('Rating: High to Low'),
+                          _buildSortChip('Fastest Prep'),
+                        ],
+                      ),
                     ),
-                  ),
+
+                    // Results Area
+                    Expanded(
+                      child: results.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.search_off_rounded, size: 70, color: theme.disabledColor),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'No results found for "${_searchController.text}"',
+                                    style: TextStyle(fontWeight: FontWeight.bold, color: theme.disabledColor),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              physics: const BouncingScrollPhysics(),
+                              padding: EdgeInsets.fromLTRB(20, 8, 20, totalCartItems > 0 ? 100 : 20),
+                              itemCount: results.length,
+                              itemBuilder: (context, index) {
+                                final searchItem = results[index];
+                                final qty = _cartManager.items[searchItem.item.id]?.quantity ?? 0;
+                                return _buildDishSearchResultCard(searchItem, qty, theme, primaryColor);
+                              },
+                            ),
+                    ),
+                  ],
                 ),
 
-                // Dish Results List
-                Expanded(
-                  child: results.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                // Floating Bottom Cart Bar
+                if (totalCartItems > 0)
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 20,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: primaryColor,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: primaryColor.withOpacity(0.4),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.search_off_rounded, size: 64, color: Colors.grey),
-                              const SizedBox(height: 12),
                               Text(
-                                'No dishes found for "${_searchController.text}"',
-                                style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
+                                '$totalCartItems ITEM${totalCartItems > 1 ? 'S' : ''}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                ),
                               ),
-                              const SizedBox(height: 4),
                               Text(
-                                'Try searching for "Momos", "Burger", "Shake" or "Bunny"',
-                                style: theme.textTheme.bodySmall,
+                                '₹${totalCartPrice.toInt()}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 18,
+                                ),
                               ),
                             ],
                           ),
-                        )
-                      : ListView.builder(
-                          physics: const BouncingScrollPhysics(),
-                          padding: EdgeInsets.fromLTRB(20, 8, 20, _totalCartItems > 0 ? 100 : 20),
-                          itemCount: results.length,
-                          itemBuilder: (context, index) {
-                            final searchItem = results[index];
-                            final qty = _cart[searchItem.item.id] ?? 0;
-                            return _buildDishSearchResultCard(searchItem, qty, theme, primaryColor);
-                          },
-                        ),
-                ),
-              ],
-            ),
-
-            // Floating Bottom Cart Bar
-            if (_totalCartItems > 0)
-              Positioned(
-                left: 20,
-                right: 20,
-                bottom: 20,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: primaryColor.withOpacity(0.4),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$_totalCartItems ITEM${_totalCartItems > 1 ? 'S' : ''}',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                          ),
-                          Text(
-                            '₹${_totalCartPrice.toInt()}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 18,
+                          GestureDetector(
+                            onTap: () {
+                              context.go('/dashboard?tab=1'); // Navigates to Cart Tab
+                            },
+                            child: Row(
+                              children: const [
+                                Text(
+                                  'View Cart',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                SizedBox(width: 6),
+                                Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                      GestureDetector(
-                        onTap: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Cart feature coming next!')),
-                          );
-                        },
-                        child: Row(
-                          children: const [
-                            Text(
-                              'View Cart',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            SizedBox(width: 6),
-                            Icon(Icons.arrow_forward_rounded, color: Colors.white, size: 20),
-                          ],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-          ],
-        ),
-      ),
+              ],
+            ),
     );
   }
 
@@ -467,7 +493,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 child: qty == 0
                     ? InkWell(
-                        onTap: () => _addItem(item.id),
+                        onTap: () => _addItem(item, canteen),
                         borderRadius: BorderRadius.circular(10),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
@@ -501,7 +527,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                             padding: EdgeInsets.zero,
                             icon: const Icon(Icons.add, color: Colors.white, size: 16),
-                            onPressed: () => _addItem(item.id),
+                            onPressed: () => _addItem(item, canteen),
                           ),
                         ],
                       ),
@@ -509,6 +535,27 @@ class _SearchScreenState extends State<SearchScreen> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildShimmer(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(20),
+        itemCount: 3,
+        itemBuilder: (context, index) => Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: Container(
+            height: 120,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -167,22 +167,29 @@ class VendorMenuItemCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    _ActionChip(icon: Iconsax.edit, label: 'Edit', color: Colors.blue, onTap: onEdit),
-                    const SizedBox(width: 7),
-                    _ActionChip(
-                      icon: item.isOutOfStock ? Iconsax.tick_circle : Iconsax.close_circle,
-                      label: item.isOutOfStock ? 'In Stock' : 'Out of Stock',
-                      color: item.isOutOfStock ? Colors.green : Colors.orange,
-                      onTap: onToggleStock,
+                    Expanded(
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _ActionChip(icon: Iconsax.edit, label: 'Edit', color: Colors.blue, onTap: onEdit),
+                          _ActionChip(
+                            icon: item.isOutOfStock ? Iconsax.tick_circle : Iconsax.close_circle,
+                            label: item.isOutOfStock ? 'In Stock' : 'Out of Stock',
+                            color: item.isOutOfStock ? Colors.green : Colors.orange,
+                            onTap: onToggleStock,
+                          ),
+                          _ActionChip(
+                            icon: item.isTodaysSpecial ? Icons.star_rounded : Icons.star_outline_rounded,
+                            label: 'Special',
+                            color: item.isTodaysSpecial ? Colors.amber : Colors.grey,
+                            onTap: onToggleSpecial,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: 7),
-                    _ActionChip(
-                      icon: item.isTodaysSpecial ? Icons.star_rounded : Icons.star_outline_rounded,
-                      label: 'Special',
-                      color: item.isTodaysSpecial ? Colors.amber : Colors.grey,
-                      onTap: onToggleSpecial,
-                    ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     GestureDetector(
                       onTap: onDelete,
                       child: const Padding(

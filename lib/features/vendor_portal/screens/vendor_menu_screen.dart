@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../../../core/config/api_config.dart';
+import '../../auth/services/auth_service.dart';
+import '../../dashboard/services/canteen_service.dart';
 import '../../vendor_portal/screens/vendor_add_item_screen.dart';
-import 'package:tomato/features/vendor_portal/screens/vendor_add_item_screen.dart' hide VendorAddItemScreen;
 import '../data/vendor_menu_data.dart';
 import '../widgets/vendor_menu_item_card.dart';
 
@@ -13,11 +17,67 @@ class VendorMenuScreen extends StatefulWidget {
 }
 
 class _VendorMenuScreenState extends State<VendorMenuScreen> {
-  List<VendorMenuItem> _items = getSampleMenuItems();
+  List<VendorMenuItem> _items = [];
+  bool _isLoading = true;
+  String _vendorId = '';
   bool _isMenuLive = true;
   String _sortBy = 'Default';
   String _filterBy = 'All';
   bool _showCombos = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVendorIdAndMenu();
+  }
+
+  void _loadVendorIdAndMenu() async {
+    final vId = await AuthService().getVendorId();
+    setState(() {
+      _vendorId = vId ?? '';
+    });
+    _fetchMenu();
+  }
+
+  Future<void> _fetchMenu() async {
+    if (_vendorId.isEmpty) return;
+    setState(() {
+      _isLoading = true;
+    });
+    try {
+      final itemsData = await CanteenService().getMenuForCafe(_vendorId);
+      final list = itemsData.map((item) {
+        final price = (item['price'] as num?)?.toDouble() ?? 0.0;
+        return VendorMenuItem(
+          id: item['_id'] ?? '',
+          name: item['name'] ?? '',
+          price: price,
+          description: item['description'] ?? '',
+          prepTimeMins: item['prepTimeMins'] ?? 10,
+          priceCategory: price < 99 ? 'Under ₹99' : (price < 149 ? 'Under ₹149' : 'Special'),
+          cuisineCategory: item['category'] ?? 'Snacks',
+          isOutOfStock: !(item['isAvailable'] ?? true),
+          isTodaysSpecial: false,
+          rating: 4.5,
+          reviewCount: 120,
+        );
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _items = list;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      debugPrint('Error fetching vendor menu: $e');
+    }
+  }
 
   int get _specialCount => _items.where((i) => i.isTodaysSpecial).length;
 
@@ -40,7 +100,7 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => VendorAddItemScreen(
         specialCount: _specialCount,
-        onSave: (item) => setState(() => _items.add(item)),
+        onSave: (item) => _addItemToBackend(item),
       ),
     ));
   }
@@ -50,16 +110,115 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
       builder: (_) => VendorAddItemScreen(
         existingItem: item,
         specialCount: _specialCount,
-        onSave: (updated) => setState(() {
-          final idx = _items.indexWhere((e) => e.id == updated.id);
-          if (idx != -1) _items[idx] = updated;
-        }),
+        onSave: (updated) => _updateItemInBackend(updated),
       ),
-    )).then((_) => setState(() {}));
+    ));
   }
 
-  void _toggleStock(VendorMenuItem item) =>
-      setState(() => item.isOutOfStock = !item.isOutOfStock);
+  Future<void> _addItemToBackend(VendorMenuItem item) async {
+    final token = await AuthService().getToken();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/menu/add-item/$_vendorId');
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'name': item.name,
+          'price': item.price,
+          'description': item.description,
+          'category': item.cuisineCategory,
+          'isAvailable': !item.isOutOfStock,
+        }),
+      );
+      if (response.statusCode == 201) {
+        _fetchMenu();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to add item')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error adding item: $e');
+    }
+  }
+
+  Future<void> _updateItemInBackend(VendorMenuItem item) async {
+    final token = await AuthService().getToken();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/menu/${item.id}');
+    try {
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'name': item.name,
+          'price': item.price,
+          'description': item.description,
+          'category': item.cuisineCategory,
+          'isAvailable': !item.isOutOfStock,
+        }),
+      );
+      if (response.statusCode == 200) {
+        _fetchMenu();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to update item')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error updating item: $e');
+    }
+  }
+
+  Future<void> _deleteItemFromBackend(String itemId) async {
+    final token = await AuthService().getToken();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/menu/$itemId');
+    try {
+      final response = await http.delete(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+        },
+      );
+      if (response.statusCode == 200) {
+        _fetchMenu();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete item')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error deleting item: $e');
+    }
+  }
+
+  void _toggleStock(VendorMenuItem item) async {
+    final newStockStatus = !item.isOutOfStock;
+    final token = await AuthService().getToken();
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/menu/${item.id}');
+    try {
+      final response = await http.put(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'isAvailable': !newStockStatus,
+        }),
+      );
+      if (response.statusCode == 200) {
+        _fetchMenu();
+      }
+    } catch (e) {
+      debugPrint('Error toggling stock: $e');
+    }
+  }
 
   void _toggleSpecial(VendorMenuItem item) {
     if (!item.isTodaysSpecial && _specialCount >= 2) {
@@ -87,7 +246,7 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
-              setState(() => _items.remove(item));
+              _deleteItemFromBackend(item.id);
               Navigator.pop(context);
             },
             child: const Text('Remove', style: TextStyle(color: Colors.white)),
@@ -110,29 +269,34 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
           children: [
             _buildHeader(isDark),
             Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
-                children: [
-                  _buildLiveToggle(isDark),
-                  const SizedBox(height: 16),
-                  _buildSortFilterSection(isDark),
-                  const SizedBox(height: 20),
-                  if (specials.isNotEmpty && _filterBy == 'All') ...[
-                    _buildSectionLabel('⭐  Today\'s Specials', Colors.amber.shade700),
-                    const SizedBox(height: 10),
-                    ...specials.map((item) => _card(item)),
-                    const SizedBox(height: 8),
-                    _buildSectionLabel('📋  Full Menu', Theme.of(context).primaryColor),
-                    const SizedBox(height: 10),
-                  ],
-                  if (allItems.isEmpty)
-                    _buildEmptyState()
-                  else
-                    ...allItems.map((item) => _card(item)),
-                  const SizedBox(height: 20),
-                  _buildComboSection(isDark),
-                ],
-              ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : RefreshIndicator(
+                      onRefresh: _fetchMenu,
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 120),
+                        children: [
+                          _buildLiveToggle(isDark),
+                          const SizedBox(height: 16),
+                          _buildSortFilterSection(isDark),
+                          const SizedBox(height: 20),
+                          if (specials.isNotEmpty && _filterBy == 'All') ...[
+                            _buildSectionLabel('⭐  Today\'s Specials', Colors.amber.shade700),
+                            const SizedBox(height: 10),
+                            ...specials.map((item) => _card(item)),
+                            const SizedBox(height: 8),
+                            _buildSectionLabel('📋  Full Menu', Theme.of(context).primaryColor),
+                            const SizedBox(height: 10),
+                          ],
+                          if (allItems.isEmpty)
+                            _buildEmptyState()
+                          else
+                            ...allItems.map((item) => _card(item)),
+                          const SizedBox(height: 20),
+                          _buildComboSection(isDark),
+                        ],
+                      ),
+                    ),
             ),
           ],
         ),
@@ -174,9 +338,9 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.green.withValues(alpha: 0.1),
+              color: Colors.green.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+              border: Border.all(color: Colors.green.withOpacity(0.3)),
             ),
             child: Text(
               '${_items.where((i) => !i.isOutOfStock).length} Live',
@@ -193,10 +357,10 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
       duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _isMenuLive ? Colors.green.withValues(alpha: 0.08) : Colors.red.withValues(alpha: 0.08),
+        color: _isMenuLive ? Colors.green.withOpacity(0.08) : Colors.red.withOpacity(0.08),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: _isMenuLive ? Colors.green.withValues(alpha: 0.3) : Colors.red.withValues(alpha: 0.3),
+          color: _isMenuLive ? Colors.green.withOpacity(0.3) : Colors.red.withOpacity(0.3),
         ),
       ),
       child: Row(
@@ -230,9 +394,26 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
           ),
           Switch(
             value: _isMenuLive,
-            activeThumbColor: Colors.green,
-            inactiveThumbColor: Colors.red,
-            onChanged: (val) => setState(() => _isMenuLive = val),
+            activeColor: Colors.green,
+            activeTrackColor: Colors.green.withOpacity(0.3),
+            onChanged: (val) async {
+              final token = await AuthService().getToken();
+              try {
+                final response = await http.put(
+                  Uri.parse('${ApiConfig.baseUrl}/api/vendors/status'),
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer $token',
+                  },
+                  body: jsonEncode({'isOpen': val}),
+                );
+                if (response.statusCode == 200) {
+                  setState(() => _isMenuLive = val);
+                }
+              } catch (e) {
+                debugPrint('Error updating shop status: $e');
+              }
+            },
           ),
         ],
       ),
@@ -283,7 +464,7 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
                   color: _filterBy == f
-                      ? Theme.of(context).primaryColor.withValues(alpha: 0.15)
+                      ? Theme.of(context).primaryColor.withOpacity(0.15)
                       : (isDark ? const Color(0xFF2A2A2A) : Colors.grey.shade100),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
@@ -344,7 +525,7 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.purple.withValues(alpha: 0.1),
+                      color: Colors.purple.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Iconsax.category_2, color: Colors.purple, size: 22),
@@ -373,9 +554,9 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.purple.withValues(alpha: 0.05),
+                      color: Colors.purple.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.purple.withValues(alpha: 0.15)),
+                      border: Border.all(color: Colors.purple.withOpacity(0.15)),
                     ),
                     child: const Row(
                       children: [

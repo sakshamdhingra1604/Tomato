@@ -10,6 +10,10 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:tomato/features/vendor_portal/widgets/profile_widgets.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../../../core/config/api_config.dart';
+import '../../auth/services/auth_service.dart';
 
 class VendorProfileScreen extends StatefulWidget {
   const VendorProfileScreen({Key? key}) : super(key: key);
@@ -77,9 +81,12 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              context.go('/login');
+              await AuthService().logout();
+              if (mounted) {
+                context.go('/login');
+              }
             },
             child: const Text('Log Out',
                 style: TextStyle(color: Colors.white)),
@@ -307,10 +314,27 @@ class _VendorProfileScreenState extends State<VendorProfileScreen> {
           title: 'Shop Status',
           subtitle: _isOnline ? 'Currently accepting orders' : 'Shop is offline',
           toggleValue: _isOnline,
-          onToggle: (val) {
+          onToggle: (val) async {
             HapticFeedback.lightImpact();
-            setState(() => _isOnline = val);
-            _showSnack(val ? 'Shop is now Online ✅' : 'Shop is now Offline ⛔');
+            try {
+              final token = await AuthService().getToken();
+              final response = await http.put(
+                Uri.parse('${ApiConfig.baseUrl}/api/vendors/status'),
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': 'Bearer $token',
+                },
+                body: jsonEncode({'isOpen': val}),
+              );
+              if (response.statusCode == 200) {
+                setState(() => _isOnline = val);
+                _showSnack(val ? 'Shop is now Online ✅' : 'Shop is now Offline ⛔');
+              } else {
+                _showSnack('Failed to update status');
+              }
+            } catch (e) {
+              _showSnack('Network error: $e');
+            }
           },
         ),
         _divider(isDark),

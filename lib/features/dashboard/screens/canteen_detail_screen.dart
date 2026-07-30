@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
 import '../data/canteen_data.dart';
 import '../widgets/menu_item_card.dart';
 import '../widgets/floating_cart_bar.dart';
+import '../services/cart_manager.dart';
+import '../services/canteen_service.dart';
 
 class CanteenDetailScreen extends StatefulWidget {
   final Canteen canteen;
@@ -14,20 +17,75 @@ class CanteenDetailScreen extends StatefulWidget {
 }
 
 class _CanteenDetailScreenState extends State<CanteenDetailScreen> {
-  final Map<String, int> _cart = {}; // itemId -> quantity
+  final CartManager _cartManager = CartManager();
+  final CanteenService _canteenService = CanteenService();
+  List<MenuItem> _menuItems = [];
+  bool _isLoading = true;
   String _searchQuery = '';
   String _selectedCategory = 'All';
 
+  @override
+  void initState() {
+    super.initState();
+    _cartManager.addListener(_onCartChanged);
+    _loadMenu();
+  }
+
+  @override
+  void dispose() {
+    _cartManager.removeListener(_onCartChanged);
+    super.dispose();
+  }
+
+  void _onCartChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _loadMenu() async {
+    try {
+      final itemsData = await _canteenService.getMenuForCafe(widget.canteen.id);
+      final list = itemsData.map((item) {
+        return MenuItem(
+          id: item['_id'] ?? '',
+          name: item['name'] ?? '',
+          price: (item['price'] as num?)?.toDouble() ?? 0.0,
+          description: item['description'] ?? '',
+          rating: 4.5,
+          reviewsCount: 20,
+          category: item['category'] ?? 'Snacks',
+          isVeg: true,
+          prepTimeMins: 10,
+        );
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _menuItems = list;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      debugPrint('Error loading menu: $e');
+    }
+  }
+
   List<String> get _categories {
     final Set<String> cats = {'All'};
-    for (var item in widget.canteen.menuItems) {
+    for (var item in _menuItems) {
       cats.add(item.category);
     }
     return cats.toList();
   }
 
   List<MenuItem> get _filteredMenuItems {
-    return widget.canteen.menuItems.where((item) {
+    return _menuItems.where((item) {
       final matchesSearch = item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           item.description.toLowerCase().contains(_searchQuery.toLowerCase());
       final matchesCategory = _selectedCategory == 'All' || item.category == _selectedCategory;
@@ -35,41 +93,28 @@ class _CanteenDetailScreenState extends State<CanteenDetailScreen> {
     }).toList();
   }
 
-  int get _totalCartItems {
-    return _cart.values.fold(0, (sum, count) => sum + count);
+  void _addItem(MenuItem item) {
+    _cartManager.addItem(
+      id: item.id,
+      name: item.name,
+      price: item.price,
+      description: item.description,
+      prepTimeMins: item.prepTimeMins,
+      vendorId: widget.canteen.id,
+      vendorName: widget.canteen.name,
+    );
   }
 
-  double get _totalCartPrice {
-    double total = 0;
-    _cart.forEach((itemId, qty) {
-      final item = widget.canteen.menuItems.firstWhere((element) => element.id == itemId);
-      total += (item.price * qty);
-    });
-    return total;
-  }
-
-  void _addItem(String id) {
-    setState(() {
-      _cart[id] = (_cart[id] ?? 0) + 1;
-    });
-  }
-
-  void _removeItem(String id) {
-    setState(() {
-      if (_cart.containsKey(id)) {
-        if (_cart[id]! > 1) {
-          _cart[id] = _cart[id]! - 1;
-        } else {
-          _cart.remove(id);
-        }
-      }
-    });
+  void _removeItem(MenuItem item) {
+    _cartManager.removeItem(item.id);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
+    final totalCartItems = _cartManager.totalItems;
+    final totalCartPrice = _cartManager.totalPrice;
 
     return Scaffold(
       body: SafeArea(
@@ -199,76 +244,102 @@ class _CanteenDetailScreenState extends State<CanteenDetailScreen> {
                 ),
 
                 // Category Filter Chips
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: 50,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: _categories.length,
-                      itemBuilder: (context, index) {
-                        final category = _categories[index];
-                        final isSelected = _selectedCategory == category;
+                if (!_isLoading)
+                  SliverToBoxAdapter(
+                    child: SizedBox(
+                      height: 50,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: _categories.length,
+                        itemBuilder: (context, index) {
+                          final category = _categories[index];
+                          final isSelected = _selectedCategory == category;
 
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                          child: FilterChip(
-                            selected: isSelected,
-                            label: Text(category),
-                            labelStyle: TextStyle(
-                              color: isSelected ? Colors.white : theme.textTheme.bodyMedium?.color,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              fontSize: 12,
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                            child: FilterChip(
+                              selected: isSelected,
+                              label: Text(category),
+                              labelStyle: TextStyle(
+                                color: isSelected ? Colors.white : theme.textTheme.bodyMedium?.color,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 12,
+                              ),
+                              selectedColor: primaryColor,
+                              backgroundColor: theme.colorScheme.surface,
+                              onSelected: (bool selected) {
+                                setState(() {
+                                  _selectedCategory = category;
+                                });
+                              },
                             ),
-                            selectedColor: primaryColor,
-                            backgroundColor: theme.colorScheme.surface,
-                            onSelected: (bool selected) {
-                              setState(() {
-                                _selectedCategory = category;
-                              });
-                            },
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
-                ),
 
                 // Menu Items List
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(20, 12, 20, _totalCartItems > 0 ? 100 : 32),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final item = _filteredMenuItems[index];
-                        final qty = _cart[item.id] ?? 0;
-                        return MenuItemCard(
-                          item: item,
-                          qty: qty,
-                          onAdd: () => _addItem(item.id),
-                          onRemove: () => _removeItem(item.id),
-                        );
-                      },
-                      childCount: _filteredMenuItems.length,
-                    ),
-                  ),
-                ),
+                _isLoading
+                    ? SliverPadding(
+                        padding: const EdgeInsets.all(20),
+                        sliver: SliverToBoxAdapter(
+                          child: _buildShimmerMenu(),
+                        ),
+                      )
+                    : SliverPadding(
+                        padding: EdgeInsets.fromLTRB(20, 12, 20, totalCartItems > 0 ? 100 : 32),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final item = _filteredMenuItems[index];
+                              final cartQty = _cartManager.items[item.id]?.quantity ?? 0;
+                              return MenuItemCard(
+                                item: item,
+                                qty: cartQty,
+                                onAdd: () => _addItem(item),
+                                onRemove: () => _removeItem(item),
+                              );
+                            },
+                            childCount: _filteredMenuItems.length,
+                          ),
+                        ),
+                      ),
               ],
             ),
 
             // Modular Floating Bottom Cart Bar Widget
-            FloatingCartBar(
-              totalItems: _totalCartItems,
-              totalPrice: _totalCartPrice,
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Cart feature coming next!')),
-                );
-              },
-            ),
+            if (totalCartItems > 0)
+              FloatingCartBar(
+                totalItems: totalCartItems,
+                totalPrice: totalCartPrice,
+                onTap: () {
+                  context.go('/dashboard?tab=1'); // Navigates to Cart Tab
+                },
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerMenu() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Column(
+        children: List.generate(4, (index) => Padding(
+          padding: const EdgeInsets.only(bottom: 16.0),
+          child: Container(
+            height: 100,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        )),
       ),
     );
   }

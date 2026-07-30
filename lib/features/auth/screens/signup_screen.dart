@@ -17,6 +17,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _confirmPasswordController = TextEditingController();
   final AuthService _authService = AuthService();
   bool _isLoading = false;
+  String _selectedRole = 'student';
 
   double _passwordStrength = 0;
   String _strengthLabel = 'Weak';
@@ -73,7 +74,7 @@ class _SignupScreenState extends State<SignupScreen> {
         name: name,
         email: email,
         password: _passwordController.text,
-        role: 'student', // Default to student
+        role: _selectedRole,
       );
 
       if (mounted) {
@@ -131,7 +132,95 @@ class _SignupScreenState extends State<SignupScreen> {
                 'Join the campus delivery network',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedRole = 'student'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _selectedRole == 'student'
+                              ? Theme.of(context).primaryColor.withOpacity(0.1)
+                              : Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _selectedRole == 'student'
+                                ? Theme.of(context).primaryColor
+                                : Theme.of(context).disabledColor.withOpacity(0.3),
+                            width: _selectedRole == 'student' ? 2 : 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.restaurant_rounded,
+                              color: _selectedRole == 'student'
+                                  ? Theme.of(context).primaryColor
+                                  : Theme.of(context).disabledColor,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Student / Orderer',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: _selectedRole == 'student'
+                                    ? Theme.of(context).primaryColor
+                                    : Theme.of(context).disabledColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedRole = 'deliverer'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _selectedRole == 'deliverer'
+                              ? Theme.of(context).primaryColor.withOpacity(0.1)
+                              : Theme.of(context).colorScheme.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _selectedRole == 'deliverer'
+                                ? Theme.of(context).primaryColor
+                                : Theme.of(context).disabledColor.withOpacity(0.3),
+                            width: _selectedRole == 'deliverer' ? 2 : 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.directions_walk_rounded,
+                              color: _selectedRole == 'deliverer'
+                                  ? Theme.of(context).primaryColor
+                                  : Theme.of(context).disabledColor,
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Deliverer / Rider',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                color: _selectedRole == 'deliverer'
+                                    ? Theme.of(context).primaryColor
+                                    : Theme.of(context).disabledColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               TextField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,

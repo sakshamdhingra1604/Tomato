@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({Key? key}) : super(key: key);
@@ -13,9 +14,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  void _onNext() {
+  Future<void> _completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('has_seen_onboarding', true);
+  }
+
+  void _onNext() async {
     if (_currentPage == 1) {
-      context.go('/login');
+      await _completeOnboarding();
+      if (mounted) {
+        context.go('/login');
+      }
     } else {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 400),
@@ -24,8 +33,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
-  void _onSkip() {
-    context.go('/login');
+  void _onSkip() async {
+    await _completeOnboarding();
+    if (mounted) {
+      context.go('/login');
+    }
   }
 
   @override

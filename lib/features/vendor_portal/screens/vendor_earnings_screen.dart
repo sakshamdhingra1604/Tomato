@@ -181,30 +181,33 @@ class _VendorEarningsScreenState extends State<VendorEarningsScreen> {
   Widget _buildLifetimeMetrics(bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: EarningsMetricCard(
-              isDark: isDark,
-              icon: Iconsax.chart_1,
-              iconColor: const Color(0xFFFF6B35),
-              label: 'Lifetime Earned',
-              value: _formatAmount(_lifetimeEarned),
-              subValue: '₹${_lifetimeEarned.toStringAsFixed(0)}',
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: EarningsMetricCard(
+                isDark: isDark,
+                icon: Iconsax.chart_1,
+                iconColor: const Color(0xFFFF6B35),
+                label: 'Lifetime Earned',
+                value: _formatAmount(_lifetimeEarned),
+                subValue: '₹${_lifetimeEarned.toStringAsFixed(0)}',
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: EarningsMetricCard(
-              isDark: isDark,
-              icon: Iconsax.bag_tick_2,
-              iconColor: Colors.blue,
-              label: 'Total Orders',
-              value: _lifetimeOrders.toString(),
-              subValue: 'all time completed',
+            const SizedBox(width: 12),
+            Expanded(
+              child: EarningsMetricCard(
+                isDark: isDark,
+                icon: Iconsax.bag_tick_2,
+                iconColor: Colors.blue,
+                label: 'Total Orders',
+                value: _lifetimeOrders.toString(),
+                subValue: 'all time completed',
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

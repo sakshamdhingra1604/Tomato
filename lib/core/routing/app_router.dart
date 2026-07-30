@@ -44,7 +44,11 @@ class AppRouter {
       ),
       GoRoute(
         path: '/dashboard',
-        builder: (context, state) => const MainLayoutScreen(),
+        builder: (context, state) {
+          final tabStr = state.uri.queryParameters['tab'];
+          final initialTab = tabStr != null ? int.tryParse(tabStr) ?? 0 : 0;
+          return MainLayoutScreen(initialTab: initialTab);
+        },
       ),
       GoRoute(
         path: '/canteen_detail',

@@ -149,11 +149,11 @@ class PendingPayoutBanner extends StatelessWidget {
   Widget _buildMiniStats() {
     return Row(
       children: [
-        BannerStat(label: "Today's Orders", value: '$todayOrders'),
+        Expanded(child: BannerStat(label: "Today's Orders", value: '$todayOrders')),
         _vDivider(),
-        BannerStat(label: 'Avg. Order Value', value: '₹${avgOrderValue.toStringAsFixed(0)}'),
+        Expanded(child: BannerStat(label: 'Avg. Order Value', value: '₹${avgOrderValue.toStringAsFixed(0)}')),
         _vDivider(),
-        BannerStat(label: 'Items Sold', value: '$itemsSold'),
+        Expanded(child: BannerStat(label: 'Items Sold', value: '$itemsSold')),
       ],
     );
   }
@@ -178,7 +178,7 @@ class BannerStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           value,
@@ -190,6 +190,7 @@ class BannerStat extends StatelessWidget {
         ),
         Text(
           label,
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: Colors.white.withValues(alpha: 0.65),
             fontSize: 10,
