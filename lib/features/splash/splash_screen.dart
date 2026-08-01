@@ -34,13 +34,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    // Check session & onboarding seen status before routing
     Future.delayed(const Duration(milliseconds: 3500), () async {
       if (!mounted) return;
 
       final prefs = await SharedPreferences.getInstance();
-      final hasSeenOnboarding = prefs.getBool('has_seen_onboarding') ?? false;
-
       final authService = AuthService();
       final isLoggedIn = await authService.isLoggedIn();
 
@@ -51,19 +48,18 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
         if (authType == 'vendor') {
           context.go('/vendor_dashboard');
         } else {
-          // Check if profile is complete
-          final college = prefs.getString('college_name');
-          final rollNo = prefs.getString('roll_no');
-          if (college == null || college.isEmpty || rollNo == null || rollNo.isEmpty) {
-            context.go('/student_details');
-          } else {
-            context.go('/dashboard');
-          }
+          context.go('/dashboard');
         }
       } else {
-        if (hasSeenOnboarding) {
+        final hasSeenOnboarding = prefs.getBool('has_seen_onboarding') ?? false;
+        final isFirstRun = prefs.getBool('is_first_run') ?? 
+            ((prefs.containsKey('college_name') || prefs.containsKey('user_name') || prefs.containsKey('roll_no')) ? false : true);
+
+        if (hasSeenOnboarding || !isFirstRun) {
           context.go('/login');
         } else {
+          await prefs.setBool('is_first_run', false);
+          await prefs.setBool('has_seen_onboarding', true);
           context.go('/onboarding');
         }
       }

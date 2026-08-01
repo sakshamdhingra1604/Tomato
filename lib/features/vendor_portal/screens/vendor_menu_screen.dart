@@ -117,6 +117,12 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
 
   Future<void> _addItemToBackend(VendorMenuItem item) async {
     final token = await AuthService().getToken();
+    if (token == null || token.isEmpty || _vendorId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session expired or invalid. Please log out and log in again.')),
+      );
+      return;
+    }
     final url = Uri.parse('${ApiConfig.baseUrl}/api/menu/add-item/$_vendorId');
     try {
       final response = await http.post(
@@ -147,6 +153,12 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
 
   Future<void> _updateItemInBackend(VendorMenuItem item) async {
     final token = await AuthService().getToken();
+    if (token == null || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session expired. Please log in again.')),
+      );
+      return;
+    }
     final url = Uri.parse('${ApiConfig.baseUrl}/api/menu/${item.id}');
     try {
       final response = await http.put(
@@ -177,6 +189,12 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
 
   Future<void> _deleteItemFromBackend(String itemId) async {
     final token = await AuthService().getToken();
+    if (token == null || token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Session expired. Please log in again.')),
+      );
+      return;
+    }
     final url = Uri.parse('${ApiConfig.baseUrl}/api/menu/$itemId');
     try {
       final response = await http.delete(
@@ -200,6 +218,7 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
   void _toggleStock(VendorMenuItem item) async {
     final newStockStatus = !item.isOutOfStock;
     final token = await AuthService().getToken();
+    if (token == null || token.isEmpty) return;
     final url = Uri.parse('${ApiConfig.baseUrl}/api/menu/${item.id}');
     try {
       final response = await http.put(

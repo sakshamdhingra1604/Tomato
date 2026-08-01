@@ -8,6 +8,9 @@ class OrderService {
 
   Future<Map<String, String>> _getHeaders() async {
     final token = await _authService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Authentication token not found. Please log in.');
+    }
     return {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer $token',

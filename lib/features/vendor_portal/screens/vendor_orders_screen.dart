@@ -37,12 +37,6 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
         _fetchOrders();
       }
     });
-
-    Future.delayed(const Duration(seconds: 4), () {
-      if (mounted && _isOnline) {
-        _simulateNewOrder();
-      }
-    });
   }
 
   @override
