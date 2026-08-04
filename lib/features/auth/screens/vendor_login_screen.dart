@@ -53,23 +53,6 @@ class _VendorLoginScreenState extends State<VendorLoginScreen> {
       );
       return;
     }
-
-    final String expectedPassword = '${_selectedVendor!.replaceAll(' ', '').replaceAll('\'', '')}@123';
-
-    // Mock bypass for testing frontend Vendor Portal (allows CafeName@123 and 123456)
-    if (_passwordController.text == expectedPassword || _passwordController.text == '123456') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Logged in successfully as $_selectedVendor! 🍅'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.green.shade600,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-      context.go('/vendor_dashboard');
-      return;
-    }
-
     setState(() {
       _isLoading = true;
     });
