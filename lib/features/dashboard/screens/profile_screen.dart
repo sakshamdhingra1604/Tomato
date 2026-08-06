@@ -22,6 +22,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _block = 'Block A (Hostel)';
   String _room = 'Room 304';
   bool _notificationsEnabled = true;
+  bool _walkNEarnEnabled = false;
   bool _isLoading = true;
   bool _isFetching = false;
 
@@ -340,6 +341,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           setState(() {
                             _notificationsEnabled = val;
                           });
+                        },
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    _buildSettingTile(
+                      context,
+                      icon: Icons.directions_walk_rounded,
+                      title: 'Walk N Earn?',
+                      subtitle: 'Become a student delivery partner',
+                      trailing: Switch(
+                        value: _walkNEarnEnabled,
+                        activeColor: primaryColor,
+                        onChanged: (val) {
+                          if (val == true) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Feature Coming Soon 🚀'),
+                                backgroundColor: Colors.amber,
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          }
+                          setState(() {
+                            _walkNEarnEnabled = val;
+                          });
+                          if (val == true) {
+                            Future.delayed(const Duration(milliseconds: 300), () {
+                              if (mounted) {
+                                setState(() {
+                                  _walkNEarnEnabled = false;
+                                });
+                              }
+                            });
+                          }
                         },
                       ),
                     ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../data/canteen_data.dart';
 
 class MenuItemCard extends StatelessWidget {
@@ -19,6 +20,7 @@ class MenuItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primaryColor = theme.primaryColor;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -37,6 +39,30 @@ class MenuItemCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Food Image
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 75,
+              height: 75,
+              color: isDark ? const Color(0xFF2C2C2C) : Colors.grey.shade100,
+              child: item.imageUrl != null && item.imageUrl!.isNotEmpty
+                  ? CachedNetworkImage(
+                      imageUrl: item.imageUrl!,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: primaryColor),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => const Icon(Icons.fastfood_rounded, color: Colors.grey),
+                    )
+                  : const Icon(Icons.fastfood_rounded, color: Colors.grey),
+            ),
+          ),
+          const SizedBox(width: 14),
           // Veg Indicator & Dish Details
           Expanded(
             child: Column(

@@ -5,6 +5,7 @@ class VendorMenuItem {
   String name;
   double price;
   double? specialPrice;
+  String imageUrl;
   String description;
   int prepTimeMins;
   String priceCategory;
@@ -19,6 +20,7 @@ class VendorMenuItem {
     required this.name,
     required this.price,
     this.specialPrice,
+    this.imageUrl = '',
     required this.description,
     required this.prepTimeMins,
     required this.priceCategory,

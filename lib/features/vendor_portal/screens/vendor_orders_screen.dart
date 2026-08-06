@@ -303,8 +303,10 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
     final orderId = order['_id'] ?? '';
     final shortId = orderId.length > 6 ? '#ORD-${orderId.substring(orderId.length - 6)}' : '#ORD-$orderId';
     final itemsList = order['items'] as List<dynamic>? ?? [];
-    final claimPin = order['claimPin'] ?? '1234';
-    final total = order['totalAmount'] ?? 0;
+    final claimPin = order['claimPin'] ?? '----';
+    final total = (order['totalAmount'] as num?)?.toDouble() ?? 0.0;
+    final deliveryFee = (order['deliveryFee'] as num?)?.toDouble() ?? 10.0;
+    final itemTotal = total - deliveryFee;
     final status = order['status'] ?? 'pending';
     final location = order['deliveryLocation'] ?? 'Unknown';
 
@@ -401,12 +403,37 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
                       ),
                     )),
                 const Divider(height: 24),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      'Total: ₹${total.toInt()}',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: theme.primaryColor),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Items Total:', style: TextStyle(fontSize: 12, color: theme.disabledColor)),
+                        Text('₹${itemTotal.toInt()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Delivery Charges:', style: TextStyle(fontSize: 12, color: theme.disabledColor)),
+                        Text('₹${deliveryFee.toInt()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+                      ],
+                    ),
+                    const Divider(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Grand Total:',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        Text(
+                          '₹${total.toInt()}',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: theme.primaryColor),
+                        ),
+                      ],
                     ),
                   ],
                 ),

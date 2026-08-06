@@ -73,6 +73,7 @@ class _SearchScreenState extends State<SearchScreen> {
             name: item['name'] ?? '',
             price: (item['price'] as num?)?.toDouble() ?? 0.0,
             specialPrice: item['specialPrice'] != null ? (item['specialPrice'] as num).toDouble() : null,
+            imageUrl: item['imageUrl'] ?? '',
             description: item['description'] ?? '',
             rating: 4.5,
             reviewsCount: 20,
@@ -147,7 +148,39 @@ class _SearchScreenState extends State<SearchScreen> {
     return results;
   }
 
+  void _showCartConflictDialog(BuildContext context, MenuItem item, Canteen canteen) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Replace Cart Items?'),
+        content: Text(
+          'Your cart already contains items from "${_cartManager.vendorName}". '
+          'Do you want to discard these items and start a new cart with items from "${canteen.name}"?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).primaryColor),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _cartManager.clearCart();
+              _addItem(item, canteen);
+            },
+            child: const Text('Clear & Add', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _addItem(MenuItem item, Canteen canteen) {
+    if (_cartManager.vendorId != null && _cartManager.vendorId != canteen.id) {
+      _showCartConflictDialog(context, item, canteen);
+      return;
+    }
     _cartManager.addItem(
       id: item.id,
       name: item.name,

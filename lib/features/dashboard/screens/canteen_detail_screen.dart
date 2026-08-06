@@ -52,6 +52,7 @@ class _CanteenDetailScreenState extends State<CanteenDetailScreen> {
           name: item['name'] ?? '',
           price: (item['price'] as num?)?.toDouble() ?? 0.0,
           specialPrice: item['specialPrice'] != null ? (item['specialPrice'] as num).toDouble() : null,
+          imageUrl: item['imageUrl'] ?? '',
           description: item['description'] ?? '',
           rating: 4.5,
           reviewsCount: 20,
@@ -94,7 +95,39 @@ class _CanteenDetailScreenState extends State<CanteenDetailScreen> {
     }).toList();
   }
 
+  void _showCartConflictDialog(BuildContext context, MenuItem item) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Replace Cart Items?'),
+        content: Text(
+          'Your cart already contains items from "${_cartManager.vendorName}". '
+          'Do you want to discard these items and start a new cart with items from "${widget.canteen.name}"?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).primaryColor),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _cartManager.clearCart();
+              _addItem(item);
+            },
+            child: const Text('Clear & Add', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _addItem(MenuItem item) {
+    if (_cartManager.vendorId != null && _cartManager.vendorId != widget.canteen.id) {
+      _showCartConflictDialog(context, item);
+      return;
+    }
     _cartManager.addItem(
       id: item.id,
       name: item.name,

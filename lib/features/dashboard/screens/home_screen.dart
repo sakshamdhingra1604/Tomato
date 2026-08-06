@@ -49,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
             name: item['name'] ?? '',
             price: (item['price'] as num?)?.toDouble() ?? 0.0,
             specialPrice: item['specialPrice'] != null ? (item['specialPrice'] as num).toDouble() : null,
+            imageUrl: item['imageUrl'] ?? '',
             description: item['description'] ?? '',
             rating: 4.5,
             reviewsCount: 20,

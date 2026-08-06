@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'dart:io';
+import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart' as http;
+import '../../../core/config/api_config.dart';
+import '../../auth/services/auth_service.dart';
 import '../data/vendor_menu_data.dart';
 
 class VendorAddItemScreen extends StatefulWidget {
@@ -29,7 +35,8 @@ class _VendorAddItemScreenState extends State<VendorAddItemScreen> {
   String _priceCategory = 'Under ₹99';
   String _cuisineCategory = 'North Indian';
   bool _isTodaysSpecial = false;
-  bool _mockImageSelected = false;
+  String? _imageUrl;
+  bool _isUploadingImage = false;
 
   final List<String> _priceCategories = ['Under ₹99', 'Under ₹149', 'Special'];
   final List<String> _cuisineCategories = [
@@ -50,6 +57,7 @@ class _VendorAddItemScreenState extends State<VendorAddItemScreen> {
       _priceCategory = item.priceCategory;
       _cuisineCategory = item.cuisineCategory;
       _isTodaysSpecial = item.isTodaysSpecial;
+      _imageUrl = item.imageUrl;
     }
   }
 
@@ -61,6 +69,59 @@ class _VendorAddItemScreenState extends State<VendorAddItemScreen> {
     _descCtrl.dispose();
     _prepTimeCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickAndUploadImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
+    
+    if (pickedFile == null) return;
+
+    setState(() {
+      _isUploadingImage = true;
+    });
+
+    try {
+      final token = await AuthService().getToken();
+      final url = Uri.parse('${ApiConfig.baseUrl}/api/upload/image');
+      final request = http.MultipartRequest('POST', url)
+        ..headers['Authorization'] = 'Bearer $token'
+        ..files.add(await http.MultipartFile.fromPath('image', pickedFile.path));
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true) {
+          setState(() {
+            _imageUrl = data['imageUrl'];
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Image uploaded successfully! 📸'), backgroundColor: Colors.green),
+            );
+          }
+        } else {
+          throw Exception(data['message'] ?? 'Upload failed');
+        }
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Error uploading image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Image upload failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+      }
+    }
   }
 
   void _handleSave() {
@@ -87,6 +148,7 @@ class _VendorAddItemScreenState extends State<VendorAddItemScreen> {
       specialPrice: _specialPriceCtrl.text.trim().isNotEmpty
           ? double.tryParse(_specialPriceCtrl.text.trim())
           : null,
+      imageUrl: _imageUrl ?? '',
       description: _descCtrl.text.trim(),
       prepTimeMins: int.tryParse(_prepTimeCtrl.text) ?? 10,
       priceCategory: _priceCategory,
@@ -182,53 +244,67 @@ class _VendorAddItemScreenState extends State<VendorAddItemScreen> {
   }
 
   Widget _buildImageUpload(bool isDark) {
+    final hasImage = _imageUrl != null && _imageUrl!.isNotEmpty;
     return GestureDetector(
-      onTap: () => setState(() => _mockImageSelected = !_mockImageSelected),
+      onTap: _isUploadingImage ? null : _pickAndUploadImage,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         height: 150,
         decoration: BoxDecoration(
-          color: _mockImageSelected
-              ? Theme.of(context).primaryColor.withValues(alpha: 0.08)
+          color: hasImage
+              ? Theme.of(context).primaryColor.withValues(alpha: 0.04)
               : (isDark ? const Color(0xFF1E1E1E) : Colors.grey.shade50),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: _mockImageSelected
-                ? Theme.of(context).primaryColor.withValues(alpha: 0.4)
+            color: hasImage
+                ? Theme.of(context).primaryColor.withValues(alpha: 0.3)
                 : (isDark ? Colors.grey.shade700 : Colors.grey.shade300),
           ),
         ),
-        child: _mockImageSelected
-            ? Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(Iconsax.image5, size: 70, color: Theme.of(context).primaryColor.withValues(alpha: 0.35)),
-                  Positioned(
-                    bottom: 12, right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text('Change Photo',
-                          style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
-                  ),
-                ],
+        child: _isUploadingImage
+            ? const Center(
+                child: CircularProgressIndicator(),
               )
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Iconsax.camera, size: 40, color: Colors.grey.shade500),
-                  const SizedBox(height: 10),
-                  Text('Tap to upload food image',
-                      style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 4),
-                  Text('PNG, JPG — max 5 MB',
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-                ],
-              ),
+            : hasImage
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Image.network(
+                          _imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(child: Icon(Icons.broken_image, size: 40));
+                          },
+                        ),
+                        Positioned(
+                          bottom: 12, right: 12,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).primaryColor,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: const Text('Change Photo',
+                                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Iconsax.camera, size: 40, color: Colors.grey.shade500),
+                      const SizedBox(height: 10),
+                      Text('Tap to upload food image',
+                          style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.w500)),
+                      const SizedBox(height: 4),
+                      Text('PNG, JPG — max 5 MB',
+                          style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
+                    ],
+                  ),
       ),
     );
   }
