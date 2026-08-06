@@ -147,33 +147,7 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
     }
   }
 
-  void _showPinVerificationDialog(String orderId) {
-    final ctrl = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Verify Handover PIN'),
-        content: TextField(
-          controller: ctrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(hintText: 'Enter student claim PIN'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _updateStatus(orderId, 'delivered');
-            },
-            child: const Text('Verify & Handover'),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -494,8 +468,8 @@ class _VendorOrdersScreenState extends State<VendorOrdersScreen> with SingleTick
             backgroundColor: Colors.green,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          onPressed: () => _showPinVerificationDialog(orderId),
-          child: const Text('Verify PIN & Handover', style: TextStyle(color: Colors.white)),
+          onPressed: () => _updateStatus(orderId, 'delivered'),
+          child: const Text('Confirm Handover / Deliver', style: TextStyle(color: Colors.white)),
         ),
       );
     }

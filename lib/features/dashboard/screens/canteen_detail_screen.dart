@@ -51,6 +51,7 @@ class _CanteenDetailScreenState extends State<CanteenDetailScreen> {
           id: item['_id'] ?? '',
           name: item['name'] ?? '',
           price: (item['price'] as num?)?.toDouble() ?? 0.0,
+          specialPrice: item['specialPrice'] != null ? (item['specialPrice'] as num).toDouble() : null,
           description: item['description'] ?? '',
           rating: 4.5,
           reviewsCount: 20,
@@ -97,7 +98,7 @@ class _CanteenDetailScreenState extends State<CanteenDetailScreen> {
     _cartManager.addItem(
       id: item.id,
       name: item.name,
-      price: item.price,
+      price: item.specialPrice ?? item.price,
       description: item.description,
       prepTimeMins: item.prepTimeMins,
       vendorId: widget.canteen.id,

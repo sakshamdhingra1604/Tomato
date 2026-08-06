@@ -52,6 +52,7 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
           id: item['_id'] ?? '',
           name: item['name'] ?? '',
           price: price,
+          specialPrice: item['specialPrice'] != null ? (item['specialPrice'] as num).toDouble() : null,
           description: item['description'] ?? '',
           prepTimeMins: item['prepTimeMins'] ?? 10,
           priceCategory: price < 99 ? 'Under ₹99' : (price < 149 ? 'Under ₹149' : 'Special'),
@@ -134,6 +135,7 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
         body: jsonEncode({
           'name': item.name,
           'price': item.price,
+          'specialPrice': item.specialPrice,
           'description': item.description,
           'category': item.cuisineCategory,
           'isAvailable': !item.isOutOfStock,
@@ -170,6 +172,7 @@ class _VendorMenuScreenState extends State<VendorMenuScreen> {
         body: jsonEncode({
           'name': item.name,
           'price': item.price,
+          'specialPrice': item.specialPrice,
           'description': item.description,
           'category': item.cuisineCategory,
           'isAvailable': !item.isOutOfStock,

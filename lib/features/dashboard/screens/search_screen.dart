@@ -72,6 +72,7 @@ class _SearchScreenState extends State<SearchScreen> {
             id: item['_id'] ?? '',
             name: item['name'] ?? '',
             price: (item['price'] as num?)?.toDouble() ?? 0.0,
+            specialPrice: item['specialPrice'] != null ? (item['specialPrice'] as num).toDouble() : null,
             description: item['description'] ?? '',
             rating: 4.5,
             reviewsCount: 20,
@@ -150,7 +151,7 @@ class _SearchScreenState extends State<SearchScreen> {
     _cartManager.addItem(
       id: item.id,
       name: item.name,
-      price: item.price,
+      price: item.specialPrice ?? item.price,
       description: item.description,
       prepTimeMins: item.prepTimeMins,
       vendorId: canteen.id,

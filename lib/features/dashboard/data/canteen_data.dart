@@ -30,6 +30,7 @@ class MenuItem {
   final String id;
   final String name;
   final double price;
+  final double? specialPrice;
   final String description;
   final double rating;
   final int reviewsCount;
@@ -41,6 +42,7 @@ class MenuItem {
     required this.id,
     required this.name,
     required this.price,
+    this.specialPrice,
     required this.description,
     required this.rating,
     required this.reviewsCount,
